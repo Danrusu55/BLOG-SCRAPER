@@ -22,7 +22,7 @@ def getProxies():
     proxies = asyncio.Queue()
     broker = Broker(proxies,timeout=1)
     tasks = asyncio.gather(
-        broker.find(types=['HTTPS'], limit=2),
+        broker.find(types=['HTTP'], limit=2),
         show(proxies))
 
     loop = asyncio.get_event_loop()
@@ -30,10 +30,12 @@ def getProxies():
 
     return(proxyList)
 
-def processWebsiteInfo(rctag,myHeaders,proxyList,keyword):
-    s = str(rctag.h3.a.get('href')).replace('/url?q=','')
-    websiteUrl = "{0.scheme}://{0.netloc}/".format(urlsplit(s))
-    r = requests.get(websiteUrl, headers=myHeaders)
+def processWebsiteInfo(rctag,keyword):
+    websiteUrl = str(rctag.h2.a.get('href'))
+    websiteUrl = "{0.scheme}://{0.netloc}/".format(urlsplit(websiteUrl))
+    websiteUrl = re.sub(r'/$', '', websiteUrl)
+    plainUrl = websiteUrl.replace('https://','').replace('http://','').replace('www.','')
+    r = requests.get(websiteUrl)
     soup = BeautifulSoup(r.text, 'html.parser')
     websiteTitle = soup.title.string
     websiteTitle = str(re.sub(r'[^\x00-\x7F]+','', websiteTitle))
@@ -45,15 +47,15 @@ def processWebsiteInfo(rctag,myHeaders,proxyList,keyword):
         else:
             while True:
                 try:
-                    proxy = random.choice(proxyList)
-                    print('Proxy using to get description: ', proxy)
-                    url = 'https://www.google.com/search?num=10&q=site%3A"{0}"'.format(websiteUrl)
+                    # proxy = random.choice(proxyList)
+                    # print('Proxy using to get description: ', proxy)
+                    url = "http://www.bing.com/search?q=site:" + plainUrl
                     # googler = requests.get(url, headers=myHeaders, proxies=proxy,timeout=4)
-                    googler = requests.get(url, timeout=4)
-                    googleSoup = BeautifulSoup(r.text, 'html.parser')
-                    rctag = googleSoup.find("div", {"class":"g"})
+                    binger = requests.get(url, timeout=15)
+                    bingSoup = BeautifulSoup(r.text, 'html.parser')
+                    rctag = bingSoup.find('li', {"class":"b_algo"})
                     if rctag:
-                        websiteDesc = str(rctag.find('span', attrs={'class':'st'}).get_text())
+                        websiteDesc = str(rctag.find('p').get_text())
                         websiteDesc = str(re.sub(r'[^\x00-\x7F]+','', websiteDesc))
                         websiteDesc = re.sub(r'[^A-Za-z\s]', '', websiteDesc.lstrip())
                         break
@@ -61,26 +63,68 @@ def processWebsiteInfo(rctag,myHeaders,proxyList,keyword):
                     pass
         # get page info
         links = soup.find_all('a')
-        contactUrl = ''
-        aboutUrl = ''
+        siteUrlDict = {'contactUrl':'', 'aboutUrl':''}
+        socialUrlDict = {'facebookUrl':'', 'linkedinUrl':'', 'twitterUrl':'', 'pinterestUrl':'', 'youtubeUrl':'', 'instagramUrl':'', 'googleplusUrl':''}
         phone = ''
         email = ''
         for link in links:
-            if 'contact' in link.get_text().lower():
-                contactUrl = link.get('href')
-            elif 'about' in link.get_text().lower() and 'us' in link.get_text().lower():
-                aboutUrl = link.get('href')
-        if not contactUrl:
-                for link in links:
-                    if link.get('href'):
-                        if 'contact' in link.get('href').lower():
-                            contactUrl = link.get('href')
-        if not aboutUrl:
-                for link in links:
-                    if link.get('href'):
-                        if 'about' in link.get('href').lower() and 'us' in link.get_text().lower():
-                            aboutUrl = link.get('href')
-
+            if link.get('href'):
+                if 'contact' in link.get_text().lower():
+                    siteUrlDict['contactUrl'] = link.get('href')
+                    if websiteUrl not in siteUrlDict['contactUrl']:
+                        siteUrlDict['contactUrl'] = websiteUrl + link.get('href')
+                elif 'about' in link.get_text().lower() and 'us' in link.get_text().lower():
+                    siteUrlDict['aboutUrl'] = link.get('href')
+                    if websiteUrl not in siteUrlDict['aboutUrl']:
+                        siteUrlDict['aboutUrl'] = websiteUrl + link.get('href')
+                elif 'facebook.com' in link.get('href').lower():
+                    socialUrlDict['facebookUrl'] = link.get('href')
+                elif 'linkedin.com' in link.get('href').lower():
+                    socialUrlDict['linkedinUrl'] = link.get('href')
+                elif 'twitter.com' in link.get('href').lower():
+                    socialUrlDict['twitterUrl'] = link.get('href')
+                elif 'pinterest.com' in link.get('href').lower():
+                    socialUrlDict['pinterestUrl'] = link.get('href')
+                elif 'youtube.com' in link.get('href').lower():
+                    socialUrlDict['youtubeUrl'] = link.get('href')
+                elif 'instagram.com' in link.get('href').lower():
+                    socialUrlDict['instagramUrl'] = link.get('href')
+                elif 'plus.google.com' in link.get('href').lower():
+                    socialUrlDict['googleplusUrl'] = link.get('href')
+        for key, value in socialUrlDict.items():
+            if not value:
+                while True:
+                    try:
+                        # proxy = random.choice(proxyList)
+                        # print('Proxy using to get description: ', proxy)
+                        url = "http://www.bing.com/search?q=site:" + key.replace('Url','') + '.com%20' + plainUrl
+                        # googler = requests.get(url, headers=myHeaders, proxies=proxy,timeout=15)
+                        binger = requests.get(url, timeout=15)
+                        bingSoup = BeautifulSoup(binger.text, 'html.parser')
+                        rctag = bingSoup.find('li', {"class":"b_algo"})
+                        if rctag:
+                            value = str(rctag.h2.a.get('href'))
+                            socialUrlDict[key] = value
+                            break
+                    except:
+                        pass
+        for key, value in siteUrlDict.items():
+            if not value:
+                while True:
+                    try:
+                        # proxy = random.choice(proxyList)
+                        # print('Proxy using to get description: ', proxy)
+                        url = "http://www.bing.com/search?q=site:" + plainUrl + '%20' + key.replace('Url','')
+                        # googler = requests.get(url, headers=myHeaders, proxies=proxy,timeout=15)
+                        binger = requests.get(url, timeout=15)
+                        bingSoup = BeautifulSoup(binger.text, 'html.parser')
+                        rctag = bingSoup.find('li', {"class":"b_algo"})
+                        if rctag:
+                            value = str(rctag.h2.a.get('href'))
+                            siteUrlDict[key] = value
+                            break
+                    except:
+                        pass
         if re.findall('\(?\d{3}[\)-]?\s?\d{3}[-\s\.]\d{4}',str(soup)):
             phone = re.findall('\(?\d{3}[\)-]?\s?\d{3}[-\s\.]\d{4}',str(soup))[0]
         if re.findall("[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+",str(soup)):
@@ -113,20 +157,20 @@ def processWebsiteInfo(rctag,myHeaders,proxyList,keyword):
 if __name__ == "__main__":
     try:
         keywordNums = getkeywords()
-        proxyList = getProxies()
+        proxy = {'https':'83.149.70.159:13012'}
         searchNumber = 10
         for idx,keywordNum in enumerate(keywordNums):
             print("Working on {0} out of {1}".format(idx + 1, len(keywordNums)))
             keyword = keywordNum[1]
-            url = "http://www.bing.com/search?q=" + keyword
+            url = "http://www.bing.com/search?q=blog%20intitle%3A\"" + keyword + '"'
             print("keyword working: " + keyword)
             while True:
-                proxy = random.choice(proxyList)
-                myHeaders = {'User-agent':ua.chrome}
-                print('Proxy using: ', proxy)
+                # proxy = random.choice(proxyList)
+                # myHeaders = {'User-agent':ua.chrome}
+                # print('Proxy using: ', proxy)
                 try:
-                    # r = requests.get(url, headers=myHeaders, proxies=proxy, timeout=4)
-                    # r = requests.get(url, timeout=4)
+                    r = requests.get(url, headers=myHeaders, proxies=proxy, timeout=15)
+                    # r = requests.get(url, timeout=15)
                     r = requests.get(url, timeout=15)
                     print(r)
                     if str(r) != '<Response [200]>':
@@ -135,12 +179,12 @@ if __name__ == "__main__":
                     continue
                 soup = BeautifulSoup(r.text, 'html.parser')
                 rctags = []
-                rctags = soup.find_all("div", {"class":"g"})
+                rctags = soup.findAll('li', {"class":"b_algo"})
                 print('number of rctags: ' + str(len(rctags)))
                 if not rctags:
                     continue
                 for rctag in rctags:
-                    processWebsiteInfo(rctag,myHeaders,proxyList,keyword)
+                    processWebsiteInfo(rctag,keyword)
                 cursor.execute("UPDATE keywords SET lastscraped=%s WHERE id='%s'" % ('UTC_TIMESTAMP()',keywordNum[0]))
                 cnx.commit()
                 break

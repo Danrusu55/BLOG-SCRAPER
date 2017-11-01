@@ -15,7 +15,7 @@ from bs4 import BeautifulSoup
 import asyncio
 from proxybroker import Broker
 from urllib.parse import urlsplit
-from fake_useragent import UserAgent
+# from fake_useragent import UserAgent
 ua = UserAgent()
 
 
