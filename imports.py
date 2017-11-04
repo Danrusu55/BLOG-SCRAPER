@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from datetime import datetime
-import logging, os, random, mysql, time, re, sys,traceback,threading,smtplib,subprocess,string,getopt,requests
+import logging, os, random, mysql, time, re, sys,traceback,threading,smtplib,subprocess,string,getopt,requests,csv,pprint
 # import http.client
 from io import open
 from mysql.connector import errorcode
@@ -15,8 +15,10 @@ from bs4 import BeautifulSoup
 import asyncio
 from proxybroker import Broker
 from urllib.parse import urlsplit
+from fuzzywuzzy import fuzz
+import urllib.request
 # from fake_useragent import UserAgent
-ua = UserAgent()
+# ua = UserAgent()
 
 
 # DECLARING VARIABLES
@@ -32,3 +34,11 @@ dbPass = os.environ['MYSQL_PASS']
 # DB CONNECTION
 cnx = mysql.connector.connect(user=dbUser,password=dbPass, host=hostName,database=db)
 cursor = cnx.cursor()
+
+pp = pprint.PrettyPrinter(indent=4)
+
+# FOR URLLIB
+data = None
+proxy = urllib.request.ProxyHandler({'https': '108.59.14.203:13010', 'http': '108.59.14.203:13010'})
+opener = urllib.request.build_opener(proxy)
+urllib.request.install_opener(opener)

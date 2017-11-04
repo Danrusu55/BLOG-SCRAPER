@@ -16,7 +16,7 @@ def getHeader():
     random.shuffle(UserAgentList)
     return {'User-Agent': random.choice(UserAgentList)}
 
-def processWebsiteInfo(rctag,keyword,proxy,header,pp):
+def processWebsiteInfo(rctag,keyword,header):
     siteInfoDict = {'websiteUrl':'','websiteTitle':'','websiteDesc':'','facebookUrl':'', 'linkedinUrl':'', 'twitterUrl':'', 'pinterestUrl':'', 'youtubeUrl':'', 'instagramUrl':'', 'googleplusUrl':'','contactUrl':'','aboutUrl':'','phone':'','email':''}
 
     ## GET BASIC SITE INFO - URL, TITLE, DESC
@@ -27,8 +27,9 @@ def processWebsiteInfo(rctag,keyword,proxy,header,pp):
     plainUrl = siteInfoDict['websiteUrl'].replace('https://','').replace('http://','').replace('www.','')
     print('______________________________')
     print('Work on url: ' + plainUrl)
-    r = requests.get(siteInfoDict['websiteUrl'], headers=header, timeout=100)
-    soup = BeautifulSoup(r.text, 'html.parser')
+    req = urllib.request.Request(siteInfoDict['websiteUrl'], data, header)
+    f = urllib.request.urlopen(req)
+    soup = BeautifulSoup(f.read(), 'html.parser')
     websiteTitle = soup.title.string
     websiteTitle = str(re.sub(r'[^\x00-\x7F]+','', websiteTitle))
     websiteTitle = re.sub(r'[^A-Za-z\s]', '', websiteTitle)
@@ -39,8 +40,9 @@ def processWebsiteInfo(rctag,keyword,proxy,header,pp):
         siteInfoDict['websiteDesc'] = str(soup.find('meta',{'name':'description'})).replace('<meta content="','').replace('" name="description"/>','')
     else:
         url = "http://www.bing.com/search?q=site:" + plainUrl
-        r = requests.get(url, timeout=100)
-        bingSoup = BeautifulSoup(r.text, 'html.parser')
+        req = urllib.request.Request(url, data, header)
+        f = urllib.request.urlopen(req)
+        bingSoup = BeautifulSoup(f.read(), 'html.parser')
         rctag = bingSoup.find('li', {"class":"b_algo"})
         if rctag:
             websiteDesc = str(rctag.find('p').get_text())
@@ -81,8 +83,9 @@ def processWebsiteInfo(rctag,keyword,proxy,header,pp):
     # FIND CONTACT & ABOUT PAGE
     if not siteInfoDict['contactUrl']:
         url = "https://www.bing.com/search?q=site%3A" + plainUrl + '+' + 'contact'
-        r = requests.get(url, proxies=proxy, headers=header, timeout=100)
-        soup = BeautifulSoup(r.text, 'html.parser')
+        req = urllib.request.Request(url, data, header)
+        f = urllib.request.urlopen(req)
+        soup = BeautifulSoup(f.read(), 'html.parser')
         rctags = soup.findAll('li', {"class":"b_algo"})
         if rctags:
             for rctag in rctags:
@@ -95,8 +98,9 @@ def processWebsiteInfo(rctag,keyword,proxy,header,pp):
             header = getHeader()
     if not siteInfoDict['aboutUrl']:
         url = "https://www.bing.com/search?q=site%3A" + plainUrl + '+' + 'about'
-        r = requests.get(url, proxies=proxy, headers=header, timeout=100)
-        soup = BeautifulSoup(r.text, 'html.parser')
+        req = urllib.request.Request(url, data, header)
+        f = urllib.request.urlopen(req)
+        soup = BeautifulSoup(f.read(), 'html.parser')
         rctags = soup.findAll('li', {"class":"b_algo"})
         if rctags:
             for rctag in rctags:
@@ -114,8 +118,9 @@ def processWebsiteInfo(rctag,keyword,proxy,header,pp):
     if re.findall("[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+",str(soup)):
         siteInfoDict['email'] = re.findall("[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+",str(soup))[0]
     if not siteInfoDict['phone'] or not siteInfoDict['email'] and siteInfoDict['contactUrl']:
-        r = requests.get(siteInfoDict['contactUrl'], headers=header)
-        contactSoup = BeautifulSoup(r.text, 'html.parser')
+        req = urllib.request.Request(siteInfoDict['contactUrl'], data, header)
+        f = urllib.request.urlopen(req)
+        contactSoup = BeautifulSoup(f.read(), 'html.parser')
         if not siteInfoDict['phone'] and re.findall('\(?\d{3}[\)-]?\s?\d{3}[-\s\.]\d{4}',str(contactSoup)):
             siteInfoDict['phone'] = re.findall('\(?\d{3}[\)-]?\s?\d{3}[-\s\.]\d{4}',str(contactSoup))
         if not siteInfoDict['email'] and re.findall("[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+",str(contactSoup)):
@@ -127,24 +132,27 @@ def processWebsiteInfo(rctag,keyword,proxy,header,pp):
     # GET SOCIAL MEDIA
     if not siteInfoDict['youtubeUrl']:
         url = "http://www.bing.com/search?q=site:youtube.com/user+" + plainUrl
-        r = requests.get(url, timeout=100, proxies=proxy,headers=header)
-        soup = BeautifulSoup(r.text, 'html.parser')
+        req = urllib.request.Request(url, data, header)
+        f = urllib.request.urlopen(req)
+        soup = BeautifulSoup(f.read(), 'html.parser')
         rctags = soup.findAll('li', {"class":"b_algo"})
         if rctags:
             for rctag in rctags:
                 url = str(rctag.h2.a.get('href'))
                 url = re.sub(r'/$', '', url)
                 aboutUrl = url + '/about'
-                r = requests.get(aboutUrl, timeout=100, proxies=proxy)
-                soup = BeautifulSoup(r.text, 'html.parser')
+                req = urllib.request.Request(aboutUrl, data, header)
+                f = urllib.request.urlopen(req)
+                soup = BeautifulSoup(f.read(), 'html.parser')
                 if plainUrl in str(soup):
                     siteInfoDict['youtubeUrl'] = url
                     break
             # break
     if siteInfoDict['youtubeUrl']:
         aboutUrl = siteInfoDict['youtubeUrl'] + '/about'
-        r = requests.get(aboutUrl, timeout=15, proxies=proxy, headers=header)
-        soup = BeautifulSoup(r.text, 'html.parser')
+        req = urllib.request.Request(aboutUrl, data, header)
+        f = urllib.request.urlopen(req)
+        soup = BeautifulSoup(f.read(), 'html.parser')
         socialLinks = soup.findAll('a', {"class":"about-channel-link "})
         if socialLinks:
             for link in socialLinks:
@@ -163,15 +171,17 @@ def processWebsiteInfo(rctag,keyword,proxy,header,pp):
             # break
     if not siteInfoDict['facebookUrl']:
         url = "http://www.bing.com/search?q=site:facebook.com+" + plainUrl
-        r = requests.get(url, timeout=100, proxies=proxy,headers=header)
-        soup = BeautifulSoup(r.text, 'html.parser')
+        req = urllib.request.Request(url, data, header)
+        f = urllib.request.urlopen(req)
+        soup = BeautifulSoup(f.read(), 'html.parser')
         rctags = soup.findAll('li', {"class":"b_algo"})
         for rctag in rctags:
             fbUrl = str(rctag.h2.a.get('href'))
             print('fbUrl working on: ' + fbUrl)
             if not ('/posts' in fbUrl or '/videos' in fbUrl or '/about' in fbUrl):
-                r = requests.get(fbUrl, timeout=100, proxies=proxy,headers=header)
-                soup = BeautifulSoup(r.text, 'html.parser')
+                req = urllib.request.Request(fbUrl, data, header)
+                f = urllib.request.urlopen(req)
+                soup = BeautifulSoup(f.read(), 'html.parser')
                 if 'Security Check Required' in str(soup):
                     break
                     # continue
@@ -191,8 +201,9 @@ def processWebsiteInfo(rctag,keyword,proxy,header,pp):
         if genEmail or not (siteInfoDict['phone'] or siteInfoDict['email']):
             handle = urlsplit(siteInfoDict['facebookUrl']).path.replace('/','')
             aboutFbUrl = 'https://www.facebook.com/pg/' + handle +'/about/?ref=page_internal'
-            r = requests.get(aboutFbUrl, timeout=100, proxies=proxy,headers=header)
-            soup = BeautifulSoup(r.text, 'html.parser')
+            req = urllib.request.Request(aboutFbUrl, data, header)
+            f = urllib.request.urlopen(req)
+            soup = BeautifulSoup(f.read(), 'html.parser')
             num = 0
             for idx,desc in enumerate(list(soup.descendants)):
                 if 'CONTACT INFO' in desc:
@@ -208,34 +219,42 @@ def processWebsiteInfo(rctag,keyword,proxy,header,pp):
                         siteInfoDict['email'] = re.findall("[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+",str(contactBox))[0]
     if not siteInfoDict['twitterUrl']:
         url = "http://www.bing.com/search?q=site:twitter.com+" + plainUrl
-        r = requests.get(url, timeout=100, proxies=proxy, headers=header)
-        soup = BeautifulSoup(r.text, 'html.parser')
+        req = urllib.request.Request(url, data, header)
+        f = urllib.request.urlopen(req)
+        soup = BeautifulSoup(f.read(), 'html.parser')
         rctags = soup.findAll('li', {"class":"b_algo"})
         for rctag in rctags:
             twitterUrl = str(rctag.h2.a.get('href'))
             if not ('/status' in twitterUrl):
-                r = requests.get(twitterUrl, timeout=100, proxies=proxy,headers=header)
-                soup = BeautifulSoup(r.text, 'html.parser')
+                req = urllib.request.Request(twitterUrl, data, header)
+                f = urllib.request.urlopen(req)
+                soup = BeautifulSoup(f.read(), 'html.parser')
                 urlFound = soup.findAll('div', {"class":"ProfileHeaderCard-url "})[0].a.get('href')
-                r = requests.get(urlFound, timeout=100, proxies=proxy,headers=header)
-                if plainUrl in r.headers['Access-Control-Allow-Origin']:
-                    siteInfoDict['twitterUrl'] = r.headers['Access-Control-Allow-Origin']
+                req = urllib.request.Request(urlFound, data, header)
+                f = urllib.request.urlopen(req)
+                soup = BeautifulSoup(f.read(), 'html.parser')
+                if plainUrl in f.get_url():
+                    siteInfoDict['twitterUrl'] = f.get_url()
                     break
         # break
     if not siteInfoDict['pinterestUrl']:
         url = "http://www.bing.com/search?q=site:pinterest.com+" + plainUrl
-        r = requests.get(url, timeout=100, proxies=proxy,headers=header)
-        soup = BeautifulSoup(r.text, 'html.parser')
+        req = urllib.request.Request(url, data, header)
+        f = urllib.request.urlopen(req)
+        soup = BeautifulSoup(f.read(), 'html.parser')
         rctags = soup.findAll('li', {"class":"b_algo"})
         for rctag in rctags:
             pinUrl = str(rctag.h2.a.get('href'))
             if not ('/pin' in pinUrl or '/explore' in pinUrl):
-                r = requests.get(pinUrl, timeout=100, proxies=proxy,headers=header)
-                soup = BeautifulSoup(r.text, 'html.parser')
+                req = urllib.request.Request(pinUrl, data, header)
+                f = urllib.request.urlopen(req)
+                soup = BeautifulSoup(f.read(), 'html.parser')
                 urlFound = soup.findAll('div', {"class":"BrioProfileHeaderWrapper"})[0].a.get('href')
-                r = requests.get(urlFound, timeout=100, proxies=proxy,headers=header)
-                if plainUrl in r.headers['Access-Control-Allow-Origin']:
-                    siteInfoDict['pinterestUrl'] = r.headers['Access-Control-Allow-Origin']
+                req = urllib.request.Request(urlFound, data, header)
+                f = urllib.request.urlopen(req)
+                soup = BeautifulSoup(f.read(), 'html.parser')
+                if plainUrl in f.get_url():
+                    siteInfoDict['pinterestUrl'] = f.get_url()
                     break
         #break
     if not siteInfoDict['instagramUrl']:
@@ -243,31 +262,36 @@ def processWebsiteInfo(rctag,keyword,proxy,header,pp):
         if handle:
             for item in [plainUrl,handle]:
                 url = "http://www.bing.com/search?q=site:instagram.com+" + item
-                r = requests.get(url, timeout=100, proxies=proxy,headers=header)
-                soup = BeautifulSoup(r.text, 'html.parser')
+                req = urllib.request.Request(url, data, header)
+                f = urllib.request.urlopen(req)
+                soup = BeautifulSoup(f.read(), 'html.parser')
                 rctags += soup.findAll('li', {"class":"b_algo"})
         else:
             url = "http://www.bing.com/search?q=site:instagram.com+" + plainUrl
-            r = requests.get(url, timeout=100, proxies=proxy,headers=header)
-            soup = BeautifulSoup(r.text, 'html.parser')
+            req = urllib.request.Request(url, data, header)
+            f = urllib.request.urlopen(req)
+            soup = BeautifulSoup(f.read(), 'html.parser')
             rctags += soup.findAll('li', {"class":"b_algo"})
         for rctag in rctags:
             instaUrl = str(rctag.h2.a.get('href'))
             if not ('instagram.com/p/' in instaUrl):
-                r = requests.get(instaUrl, timeout=100, proxies=proxy,headers=header)
-                soup = BeautifulSoup(r.text, 'html.parser')
+                req = urllib.request.Request(instaUrl, data, header)
+                f = urllib.request.urlopen(req)
+                soup = BeautifulSoup(f.read(), 'html.parser')
                 if plainUrl in str(soup):
                     siteInfoDict['instagramUrl'] = instaUrl
                     break
         # break
     if not siteInfoDict['linkedinUrl']:
         url = "http://www.bing.com/search?q=site:linkedin.com/company+" + plainUrl
-        r = requests.get(url, timeout=100, proxies=proxy,headers=header)
-        soup = BeautifulSoup(r.text, 'html.parser')
+        req = urllib.request.Request(url, data, header)
+        f = urllib.request.urlopen(req)
+        soup = BeautifulSoup(f.read(), 'html.parser')
         rctag = soup.find('li', {"class":"b_algo"})
         linkedUrl = str(rctag.h2.a.get('href'))
-        r = requests.get(linkedUrl, timeout=100, proxies=proxy,headers=header)
-        soup = BeautifulSoup(r.text, 'html.parser')
+        req = urllib.request.Request(linkedUrl, data, header)
+        f = urllib.request.urlopen(req)
+        soup = BeautifulSoup(f.read(), 'html.parser')
         if plainUrl in str(soup):
             siteInfoDict['linkedUrl'] = linkedUrl
     for key, value in siteInfoDict.items():
@@ -287,27 +311,26 @@ def processWebsiteInfo(rctag,keyword,proxy,header,pp):
 if __name__ == "__main__":
     try:
         keywords = getkeywords()
-        proxy = {'https': '108.59.14.203:13010', 'http': '108.59.14.203:13010'}
-        pp = pprint.PrettyPrinter(indent=4)
         for idx,keywords in enumerate(keywords):
             print("Working on {0} out of {1}".format(idx + 1, len(keywords)))
             keyword = keywords[1]
-            url = "http://www.bing.com/search?q=blog+intitle%3A\"" + keyword + '"'
+            url = "http://www.bing.com/search?q=blog+intitle%3A\"" + keyword.replace(' ','+') + '"'
             print("keyword working: " + keyword)
             while True:
                 try:
                     header = getHeader()
-                    r = requests.get(url, proxies=proxy, headers=header, timeout=100)
-                    if str(r) != '<Response [200]>':
+                    req = urllib.request.Request(url, data, header)
+                    f = urllib.request.urlopen(req)
+                    if f.status != 200:
                         continue
                 except:
                     continue
-                soup = BeautifulSoup(r.text, 'html.parser')
+                soup = BeautifulSoup(f.read(), 'html.parser')
                 rctags = soup.findAll('li', {"class":"b_algo"})
                 if not rctags:
                     continue
                 for rctag in rctags:
-                    processWebsiteInfo(rctag,keyword,proxy,header,pp)
+                    processWebsiteInfo(rctag,keyword,header)
                 cursor.execute("UPDATE keywords SET lastscraped=%s WHERE id='%s'" % ('UTC_TIMESTAMP()',keywordNum[0]))
                 cnx.commit()
                 break
@@ -323,8 +346,3 @@ if __name__ == "__main__":
         print('hit finally')
         if cnx:
             cnx.close()
-
-
-
-
-f = urllib.request.urlopen(urllib.request(url, headers={'User-Agent': 'Mozilla/5.0 (Macintosh Intel Mac OS X 10_9_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.1916.47 Safari/537.36’}))
