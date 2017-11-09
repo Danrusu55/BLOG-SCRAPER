@@ -1,23 +1,20 @@
-import asyncio
-from proxybroker import Broker
+import multiprocessing, time, random
 
-proxyList = []
-async def show(proxies):
-    while True:
-        proxy = await proxies.get()
-        if proxy is None:
-            break
-        print('Found proxy: %s' % proxy)
-        strProxy = str(proxy)
-        proxyList.append({'http':strProxy.split("] ",1)[1].split(">",1)[0]})
+def worker(i):
+    """worker function"""
+    randint = random.randint(0,4)
+    time.sleep(randint)
+    print('Worker ', i)
+    randint = random.randint(0,4)
+    time.sleep(randint)
+    print('Worker ', i)
+ 
+    
+    return
 
-proxies = asyncio.Queue()
-broker = Broker(proxies)
-tasks = asyncio.gather(
-    broker.find(types=['HTTP', 'HTTPS'], limit=10),
-    show(proxies))
-
-loop = asyncio.get_event_loop()
-loop.run_until_complete(tasks)
-
-print(proxyList)
+if __name__ == '__main__':
+    jobs = []
+    for i in range(5):
+        p = multiprocessing.Process(target=worker,args=(i,))
+        jobs.append(p)
+        p.start()
