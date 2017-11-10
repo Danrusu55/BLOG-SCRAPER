@@ -2,12 +2,6 @@ from imports import *
 
 # FUNCTIONS
 
-def getkeywords():
-    cursor.execute("SELECT keyword FROM keywords where lastscraped IS null")
-    keywordNums = list(cursor)
-    print("# of keywords to collect: " + str(len(keywordNums)))
-    return(keywordNums)
-
 def getHeader():
     UserAgentCSV = open(path + '/UserAgent.csv', 'r')
     UserAgentList = csv.reader(UserAgentCSV)
@@ -16,10 +10,28 @@ def getHeader():
     random.shuffle(UserAgentList)
     return {'User-Agent': random.choice(UserAgentList)}
 
+def getSoupNoProxy(url):
+    print('Getting soupt for: ' + url)
+    while True:
+        try:
+            r = requests.get(url,headers=getHeader(),timeout=5)
+            if r.status_code != 200:
+                continue
+            else:
+                soup = BeautifulSoup(r.text,'html.parser')
+                return soup
+        except Exception as err:
+            if '404' in str(err):
+                break
+            elif 'unknown url type' in str(err):
+                break
+            else:
+                continue
+
 def getSoup(url,opt=0):
     while True:
         try:
-            print('url working: ', url)
+            #print('url working: ', url)
             if not re.findall('.\.[a-zA-Z]+',url):
                 print('url no extension: ', url)
                 return False
@@ -39,8 +51,6 @@ def getSoup(url,opt=0):
                     continue
             return soup
         except Exception as err:
-            print('----------Error with conn:------')
-            print(err)
             if '404' in str(err):
                 break
             elif 'unknown url type' in str(err):
@@ -97,25 +107,6 @@ def cleanText(text):
     text = str(re.sub(r'[^\x00-\x7F]+','', text))
     text = re.sub(r'[^A-Za-z0-9\s]', '', text)
     return(text)
-
-def getSearchLinksGoogle(soup):
-    linksArray = []
-    rctags = soup.findAll('div', {"class":"g"})
-    ignoreList = ['top ','list','best']
-    if rctags:
-        for rctag in rctags:
-            siteTitle = rctag.h3.get_text().lower()
-            s = str(rctag.h3.a.get('href')).replace('/url?q=','')
-            url = "{0.scheme}://{0.netloc}/".format(urlsplit(s))
-            url = re.sub(r'/$', '', url).replace('www.','')
-            if not any(ext in siteTitle for ext in ignoreList) and not any(ext in url for ext in ignoreSites) and not (url in linksArray) and not (re.search(r'^\d',siteTitle)):
-                if 'blog' in urlsplit(s).path:
-                    linksArray.append([url,s])
-                else:
-                    linksArray.append([url,''])
-        return linksArray
-    else:
-        return False
 
 def getSearchLinks(soup):
     linksArray = []
@@ -388,7 +379,7 @@ def processWebsiteInfo(url,blogUrl,keywordUsedToFind):
     plainUrl = siteInfoDict['websiteUrl'].replace('https://','').replace('http://','').replace('www.','')
 
     # ENSURE NOT IN db
-    cursor.execute("SELECT id FROM influencers WHERE  INSTR(`websiteurl`, '{0}') > 0;".format(plainUrl))
+    #cursor.execute("SELECT id FROM influencers WHERE  INSTR(`websiteurl`, '{0}') > 0;".format(plainUrl))
     if list(cursor):
         return False
 
@@ -414,5 +405,4 @@ def processWebsiteInfo(url,blogUrl,keywordUsedToFind):
     print('Found in total:')
     pp.pprint(siteInfoDict)
 
-    cursor.execute("INSERT IGNORE INTO influencers (websiteurl, websitetitle, websitedescription, keywordusedtofind, lastscraped, pagecontact, pageabout, phone, email, facebook, twitter, pinterest, youtube, instagram, linkedin, googleplus) VALUES ('%s', '%s', '%s', '%s', %s, '%s','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s')" % (siteInfoDict['websiteUrl'],siteInfoDict['websiteTitle'],siteInfoDict['websiteDesc'],keyword,'UTC_TIMESTAMP()',siteInfoDict['contactUrl'],siteInfoDict['aboutUrl'],siteInfoDict['phone'],siteInfoDict['email'],siteInfoDict['facebookUrl'],siteInfoDict['twitterUrl'],siteInfoDict['pinterestUrl'],siteInfoDict['youtubeUrl'],siteInfoDict['instagramUrl'],siteInfoDict['linkedinUrl'],siteInfoDict['googleplusUrl']))
-    cnx.commit()
+    #cursor.execute("INSERT IGNORE INTO influencers (websiteurl, websitetitle, websitedescription, keywordusedtofind, lastscraped, pagecontact, pageabout, phone, email, facebook, twitter, pinterest, youtube, instagram, linkedin, googleplus) VALUES ('%s', '%s', '%s', '%s', %s, '%s','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s')" % (siteInfoDict['websiteUrl'],siteInfoDict['websiteTitle'],siteInfoDict['websiteDesc'],keyword,'UTC_TIMESTAMP()',siteInfoDict['contactUrl'],siteInfoDict['aboutUrl'],siteInfoDict['phone'],siteInfoDict['email'],siteInfoDict['facebookUrl'],siteInfoDict['twitterUrl'],siteInfoDict['pinterestUrl'],siteInfoDict['youtubeUrl'],siteInfoDict['instagramUrl'],siteInfoDict['linkedinUrl'],siteInfoDict['googleplusUrl']))
