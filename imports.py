@@ -19,6 +19,7 @@ from sqlalchemy import create_engine, Column, DateTime, String, Integer, Foreign
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship, scoped_session
 import pymysql, pymysql.cursors
+import facebook, twitter
 
 # DECLARING VARIABLES
 
@@ -29,6 +30,11 @@ logFile = path + 'log.txt'
 logging.basicConfig(filename=logFile,level=logging.ERROR, format='%(asctime)s - %(levelname)s - %(message)s')
 dbUser = os.environ['MYSQL_USER']
 dbPass = os.environ['MYSQL_PASS']
+fbToken = os.environ['FACEBOOK_ACCESS_TOKEN']
+#twToken = os.environ['TWITTER_ACCESS_TOKEN']
+#twToken_secret = os.environ['TWITTER_TOKEN_SECRET']
+#twConsumer_key = os.environ['TWITTER_CONSUMER_KEY']
+#twConsumer_secret = os.environ['TWITTER_CONSUMER_SECRET']
 
 
 # DB ORM SESSION
@@ -40,12 +46,20 @@ class Keyword(Base):
     id = Column('id',Integer, primary_key=True)
     keyword = Column('keyword',String(250),unique=True)
     lastscraped = Column('lastscraped',DateTime)
+    lastscrapedfacebook = Column('lastscrapedfacebook',DateTime)
+
+class MajesticUrl(Base):
+    __tablename__ = 'majesticurls'
+    id = Column('id',Integer, primary_key=True)
+    websiteurl = Column('websiteurl',String(250),unique=True)
+    lastscraped = Column('lastscraped',DateTime)
 
 class Website(Base):
     __tablename__ = 'websites'
     id = Column('id',Integer, primary_key=True)
     websiteurl = Column('websiteurl',String(250),unique=True)
     blogurl = Column('blogurl',String(250))
+    fbid = Column('fbid',String(250))
     keywordusedtofind = Column('keywordusedtofind',String(250))
     scrapedon = Column('scrapedon',DateTime,default=datetime.utcnow)
 
@@ -99,9 +113,12 @@ pp = pprint.PrettyPrinter(indent=4)
 # FOR URLLIB
 
 data = None
-proxy = urllib.request.ProxyHandler({'https': '108.59.14.203:13010', 'http': '108.59.14.203:13010'})
+proxy = urllib.request.ProxyHandler({'https': '108.59.14.208:13080', 'http': '108.59.14.208:13080'})
 opener = urllib.request.build_opener(proxy)
 urllib.request.install_opener(opener)
 
 with open('ignore_sites.txt','r') as file:
     ignoreSites = file.read().splitlines()
+
+
+

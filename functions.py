@@ -38,24 +38,25 @@ def getSoup(url,opt=0):
             header = getHeader()
             data = None
             req = urllib.request.Request(url, data, header)
-            f = urllib.request.urlopen(req, timeout=5)
-            if f.status != 200:
-                continue
-            if opt:
-                return f
-            soup = BeautifulSoup(f.read(), 'html.parser')
-            if ('redirecting' or 'security') in str(soup.title):
-                continue
-            if 'bing' in url:
-                if not soup.find('li', {"class":"b_algo"}):
+            with urllib.request.urlopen(req, timeout=5) as f:
+                if f.status != 200:
                     continue
-            return soup
+                if opt:
+                    return f
+                soup = BeautifulSoup(f.read(), 'html.parser')
+                if ('redirecting' or 'security') in str(soup.title):
+                    continue
+                if 'bing' in url:
+                    if not soup.find('li', {"class":"b_algo"}):
+                        continue
+                return soup
         except Exception as err:
             if '404' in str(err):
                 break
             elif 'unknown url type' in str(err):
                 break
             else:
+                print(err)
                 continue
 
 def cleanLink(link, websiteUrl=''):
