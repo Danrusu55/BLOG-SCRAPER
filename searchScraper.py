@@ -2,6 +2,10 @@
 from imports import *
 from functions import *
 
+engine = create_engine('mysql+pymysql://{0}:{1}@{2}/{3}'.format(dbUser,dbPass,hostName,db),echo=False,pool_recycle=3600)
+Base.metadata.create_all(bind=engine)
+Session = scoped_session(sessionmaker(bind=engine))
+
 def getSearchLinksGoogle(soup,keyword):
     linksArray = []
     rctags = soup.findAll('div', {"class":"g"})
@@ -22,13 +26,9 @@ def getSearchLinksGoogle(soup,keyword):
 
 def worker(i, keywordArray):
 
-    engine = create_engine('mysql+pymysql://{0}:{1}@{2}/{3}'.format(dbUser,dbPass,hostName,db),echo=False,pool_recycle=3600)
-    Base.metadata.create_all(bind=engine)
-    #Session = sessionmaker(bind=engine)
-    session = scoped_session(sessionmaker(autocommit=False, autoflush=False, bind=engine))
-
     for idx,keyword in enumerate(keywordArray):
         try:
+            Session = scoped_session(sessionmaker(bind=engine))
             print("Working on {0} out of {1}".format(idx + 1, len(keywordArray)))
             keyword = keyword.keyword
 
@@ -53,17 +53,17 @@ def worker(i, keywordArray):
                 blogUrl = result[1]
                 plainUrl = url.replace('https://','').replace('http://','').replace('www.','').replace('/','')
                 id = ''
-                id = session.query(Website).filter(Website.websiteurl.contains(plainUrl)).all()
+                id = Session.query(Website).filter(Website.websiteurl.contains(plainUrl)).all()
                 if not id:
-                    # print('adding url: ', url)
-                    session.add(Website(websiteurl=url,blogurl=blogUrl,keywordusedtofind=keyword))
-                    session.commit()
-                    session.close()
+                    print('adding url: ', url, ' blog: ', blogUrl)
+                    Session.add(Website(websiteurl=url,blogurl=blogUrl,keywordusedtofind=keyword))
+                    Session.commit()
+                    #session.remove()
             # UPDATE KEYWORD IN DB WHEN DONE
-            row = session.query(Keyword).filter(Keyword.keyword == keyword).first()
+            row = Session.query(Keyword).filter(Keyword.keyword == keyword).first()
             row.lastscraped = datetime.utcnow()
-            session.commit()
-            session.close()
+            Session.commit()
+            #session.remove()
         except Exception as err:
             print('Error in worker: ', err)
             print(traceback.format_exc())
@@ -75,9 +75,9 @@ if __name__ == "__main__":
     try:
         # INITIAL VARIABLES
         jobs = []
-        keywords = session.query(Keyword).filter(Keyword.lastscraped == None).all()
-        session.close()
-        numProcesses = 20
+        keywords = Session.query(Keyword).filter(Keyword.lastscraped == None).all()
+        #session.remove()
+        numProcesses = 10
         keywordArrays = numpy.array_split(numpy.array(keywords),numProcesses)
 
         # MULTIPROCESSING
