@@ -2,6 +2,10 @@
 from imports import *
 from functions import *
 
+engine = create_engine('mysql+pymysql://{0}:{1}@{2}/{3}'.format(dbUser,dbPass,hostName,db),echo=False,pool_recycle=3600)
+Base.metadata.create_all(bind=engine)
+Session = scoped_session(sessionmaker(bind=engine))
+
 def getKeywords(soup):
     keywordsArray = []
     keywords = soup.findAll('span',{'class':'badge thin'})
@@ -11,39 +15,30 @@ def getKeywords(soup):
     return keywordsArray
 
 def worker(i, urlArray):
-
-    engine = create_engine('mysql+pymysql://{0}:{1}@{2}/{3}'.format(dbUser,dbPass,hostName,db),echo=False,pool_recycle=3600)
-    Base.metadata.create_all(bind=engine)
-    #Session = sessionmaker(bind=engine)
-    session = scoped_session(sessionmaker(autocommit=False, autoflush=False, bind=engine))
-
     for idx,websiteurl in enumerate(urlArray):
         try:
+            Session = scoped_session(sessionmaker(bind=engine))
             #print("Working on {0} out of {1}".format(idx + 1, len(urlArray)))
             url = websiteurl.websiteurl
-
             while True:
-                soup = getSoup('https://www.similarsites.com/site/' + url)
+                soup = getSoupNoProxy('https://www.similarsites.com/site/' + url)
                 if soup:
                     keywordsArray = getKeywords(soup)
                     if keywordsArray:
                         for keyword in keywordsArray:
                             try:
                                 keyword.encode('ascii')
-                                if not session.query(Keyword).filter(Keyword.keyword == keyword).count():
-                                    session.add(Keyword(keyword=keyword))
-                                    session.commit()
-                                    session.close()
                             except UnicodeEncodeError:
                                 pass
-                    print(url + ' DONE')        
-                    break
-
+                        if 
+                            Session.add(Keyword(keyword=keyword))
+                        Session.commit()
+                        print(keyword + ' added')
+                        print(url + ' Keywordarray commited')
             # UPDATE websiteurl IN DB WHEN DONE
             row = session.query(MajesticUrl).filter(MajesticUrl.websiteurl == url).first()
             row.lastscraped = datetime.utcnow()
-            session.commit()
-            session.close()
+            Session.commit()
         except Exception as err:
             print('Error in worker: ', err)
             print(traceback.format_exc())
@@ -55,8 +50,7 @@ if __name__ == "__main__":
     try:
         # INITIAL VARIABLES
         jobs = []
-        urls = session.query(MajesticUrl).filter(MajesticUrl.lastscraped == None).limit(10000).all()
-        session.close()
+        urls = Session.query(MajesticUrl).filter(MajesticUrl.lastscraped == None).limit(10000).all()
         print('GOT URLS')
 
         numProcesses = 10
@@ -75,3 +69,5 @@ if __name__ == "__main__":
         print(traceback.format_exc())
     finally:
         print('FINALLY: COMPLETED')
+        Session.commit()
+        Session.close()

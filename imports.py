@@ -20,6 +20,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship, scoped_session
 import pymysql, pymysql.cursors
 import facebook, twitter
+from pymysql.err import IntegrityError
 
 # DECLARING VARIABLES
 
@@ -119,6 +120,3 @@ urllib.request.install_opener(opener)
 
 with open('ignore_sites.txt','r') as file:
     ignoreSites = file.read().splitlines()
-
-
-

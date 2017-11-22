@@ -11,7 +11,6 @@ def getHeader():
     return {'User-Agent': random.choice(UserAgentList)}
 
 def getSoupNoProxy(url):
-    print('Getting soupt for: ' + url)
     while True:
         try:
             r = requests.get(url,headers=getHeader(),timeout=5)
@@ -26,6 +25,7 @@ def getSoupNoProxy(url):
             elif 'unknown url type' in str(err):
                 break
             else:
+                print('Url error: ', err)
                 continue
 
 def getSoup(url,opt=0):
@@ -38,7 +38,7 @@ def getSoup(url,opt=0):
             header = getHeader()
             data = None
             req = urllib.request.Request(url, data, header)
-            with urllib.request.urlopen(req, timeout=5) as f:
+            with urllib.request.urlopen(req, timeout=15) as f:
                 if f.status != 200:
                     continue
                 if opt:

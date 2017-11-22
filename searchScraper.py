@@ -25,7 +25,6 @@ def getSearchLinksGoogle(soup,keyword):
         return False
 
 def worker(i, keywordArray):
-
     for idx,keyword in enumerate(keywordArray):
         try:
             Session = scoped_session(sessionmaker(bind=engine))
@@ -57,7 +56,7 @@ def worker(i, keywordArray):
                 if not id:
                     print('adding url: ', url, ' blog: ', blogUrl)
                     Session.add(Website(websiteurl=url,blogurl=blogUrl,keywordusedtofind=keyword))
-                    Session.commit()
+            Session.commit()
                     #session.remove()
             # UPDATE KEYWORD IN DB WHEN DONE
             row = Session.query(Keyword).filter(Keyword.keyword == keyword).first()
