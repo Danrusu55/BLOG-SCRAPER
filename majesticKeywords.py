@@ -18,10 +18,11 @@ def worker(i, urlArray):
     for idx,websiteurl in enumerate(urlArray):
         try:
             Session = scoped_session(sessionmaker(bind=engine))
-            #print("Working on {0} out of {1}".format(idx + 1, len(urlArray)))
+            print("Working on {0} out of {1}".format(idx + 1, len(urlArray)))
             url = websiteurl.websiteurl
             while True:
                 soup = getSoupNoProxy('https://www.similarsites.com/site/' + url)
+                print('got soup')
                 if soup:
                     keywordsArray = getKeywords(soup)
                     if keywordsArray:
@@ -30,19 +31,17 @@ def worker(i, urlArray):
                                 keyword.encode('ascii')
                             except UnicodeEncodeError:
                                 pass
-                        if 
-                            Session.add(Keyword(keyword=keyword))
+                            if not Session.query(Keyword).filter(Keyword.keyword == keyword).count():
+                                Session.add(Keyword(keyword=keyword))
+                                print(keyword + ' added')
                         Session.commit()
-                        print(keyword + ' added')
-                        print(url + ' Keywordarray commited')
             # UPDATE websiteurl IN DB WHEN DONE
-            row = session.query(MajesticUrl).filter(MajesticUrl.websiteurl == url).first()
+            row = Session.query(MajesticUrl).filter(MajesticUrl.websiteurl == url).first()
             row.lastscraped = datetime.utcnow()
             Session.commit()
         except Exception as err:
             print('Error in worker: ', err)
             print(traceback.format_exc())
-            pass
     return
 
 # MAIN
@@ -53,7 +52,7 @@ if __name__ == "__main__":
         urls = Session.query(MajesticUrl).filter(MajesticUrl.lastscraped == None).limit(10000).all()
         print('GOT URLS')
 
-        numProcesses = 10
+        numProcesses = 5
         urlArrays = numpy.array_split(numpy.array(urls),numProcesses)
 
         # MULTIPROCESSING
@@ -66,7 +65,7 @@ if __name__ == "__main__":
     except Exception as err:
         logging.error(err)
         print(err)
-        print(traceback.format_exc())
+        #print(traceback.format_exc())
     finally:
         print('FINALLY: COMPLETED')
         Session.commit()

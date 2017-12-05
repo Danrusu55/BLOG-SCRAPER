@@ -118,5 +118,5 @@ proxy = urllib.request.ProxyHandler({'https': '108.59.14.208:13080', 'http': '10
 opener = urllib.request.build_opener(proxy)
 urllib.request.install_opener(opener)
 
-with open('ignore_sites.txt','r') as file:
+with open(path + '/ignore_sites.txt','r') as file:
     ignoreSites = file.read().splitlines()
