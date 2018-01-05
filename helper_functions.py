@@ -7,6 +7,7 @@ from bs4 import BeautifulSoup
 from peewee import fn
 from urllib.parse import urlparse, urlsplit
 from models import Influencer, MajesticUrl, Keyword, objects, mysql
+import pdb
 
 proxy_gateway = 'http://108.59.14.208:13080'
 
@@ -22,7 +23,7 @@ def initDict(mainurl):
     siteInfoDict = {'mainUrl': mainurl,'blogUrl':'','title':'','desc':'','fb':'', 'li':'', 'tw':'', 'pin':'', 'yt':'', 'insta':'', 'gplus':'','contactUrl':'','aboutUrl':'','phone':'','email':'','keywordUsedToFind':''}
     return siteInfoDict
 
-async def sitesFromGoogle(soup, keyword):
+def sitesFromGoogle(soup):
     sitesArray = []
     rctags = soup.findAll('div', {"class": "g"})
     ignoreList = ['top ', 'list', 'best']
@@ -33,24 +34,14 @@ async def sitesFromGoogle(soup, keyword):
                 cleanUrl = str(rctag.h3.a.get('href')).replace('/url?q=', '').split('&')[0]
                 mainUrl = urlparse(cleanUrl).netloc
                 mainUrl = re.sub(r'/$', '', mainUrl).replace('www.', '')
-                if not any(ext in siteTitle for ext in ignoreList) and not any(ext in mainUrl for ext in IGNORESITES) and not (mainUrl in sitesArray) and not (re.search(r'^\d', siteTitle)):
-                    try:
-                        soup = await getSoupNoProxy('http://' + mainUrl)
-                    except:
-                        continue
 
-                    if keyword.lower() in str(soup.title).lower():
-                        siteInfoDict = initDict(mainUrl)
-                        siteInfoDict['title'] = soup.title
-                        siteInfoDict = getDesc(siteInfoDict)
-                        siteInfoDict = getBlogUrl(cleanUrl, mainUrl, siteTitle, siteInfoDict, soup)
-                        siteInfoDict = getOnsiteLinks(soup, siteInfoDict)
-                        siteInfoDict = getPhoneEmail(soup, siteInfoDict)
-                        sitesArray.append(siteInfoDict)
+                if not any(ext in siteTitle for ext in ignoreList) and not any(ext in mainUrl for ext in IGNORESITES) and not (mainUrl in sitesArray) and not (re.search(r'^\d', siteTitle)):
+                    sitesArray.append((mainUrl, cleanUrl, siteTitle))
+
     return sitesArray
 
 def getBlogUrl(cleanUrl, mainUrl, siteTitle, siteInfoDict, soup):
-    if 'blog' in cleanUrl or 'blog' in siteTitle:
+    if 'blog' in cleanUrl.lower() or 'blog' in siteTitle.lower():
         siteInfoDict['blogUrl'] = cleanUrl
     else:
         links = soup.find_all('a')
@@ -58,7 +49,7 @@ def getBlogUrl(cleanUrl, mainUrl, siteTitle, siteInfoDict, soup):
             if 'blog' in link.get_text() or 'blog' in urlsplit(link).path:
                 if urlsplit(link).netloc:
                     if mainUrl in urlsplit(link).netloc:
-                        siteInfoDict['blogUrl'] = link.replace('https://','').replace('http://','').replace('www.','')
+                        siteInfoDict['blogUrl'] = link.replace('https://', '').replace('http://', '').replace('www.', '')
                         break
                 else:
                     urlPath = re.sub('^/+', '', link)
@@ -87,54 +78,54 @@ async def getSoupNoProxy(url):
         except Exception as err:
             if '404' in str(err):
                 print('got 404 for ', url)
-                continue
+                raise
             elif 'unknown url type' in str(err):
-                break
+                raise
             else:
                 traceback.print_exc()
                 print('Url error: ', err)
-                continue
+                raise
 
-def getSoup(url,opt=0):
+async def getSoup(url,opt=0):
     while True:
         try:
             # print('url working: ', url)
             if not re.findall('.\.[a-zA-Z]+',url):
                 print('url no extension: ', url)
                 return False
-            header = getHeader()
-            data = None
-            req = urllib.request.Request(url, data, header)
-            with urllib.request.urlopen(req, timeout=15) as f:
-                if f.status != 200:
-                    continue
-                if opt:
-                    return f
-                soup = BeautifulSoup(f.read(), 'html.parser')
-                if ('redirecting' or 'security') in str(soup.title):
-                    continue
-                if 'bing' in url:
-                    if not soup.find('li', {"class":"b_algo"}):
-                        continue
-                return soup
+
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:57.0) Gecko/20100101 Firefox/57.0'
+            }
+
+            async with aiohttp.ClientSession() as session:
+                with async_timeout.timeout(10):
+                    async with session.get(url, headers=headers, proxy=proxy_gateway) as r:
+                        txt = await r.text()
+
+                        if r.status != 200:
+                            break
+
+                        soup = BeautifulSoup(txt, 'html.parser')
+                        return soup
         except Exception as err:
             if '404' in str(err):
-                break
+                raise
             elif 'unknown url type' in str(err):
-                break
+                raise
             else:
                 print(err)
-                continue
+                raise
 
 def cleanLink(link, websiteUrl=''):
     if ('contact' or 'about') in link:
         if urlsplit(link).netloc:
-            if plainUrl in link.netloc:
+            if websiteUrl in link.netloc:
                 return(link)
             else:
                 return('')
         else:
-            urlPath = re.sub('^/+', '', urlPath)
+            urlPath = re.sub('^/+', '', link.path)
             url = websiteUrl + '/' + urlPath
             return(urlPath)
     elif 'facebook' in link:
@@ -320,13 +311,13 @@ def getSocialLinks(siteInfoDict,plainUrl):
             siteInfoDict['linkedUrl'] = linkedUrl
     return(siteInfoDict)
 
-def getPhoneEmail(soup,siteInfoDict):
+async def getPhoneEmail(soup,siteInfoDict):
     if re.findall('\(?\d{3}[\)-]?\s?\d{3}[-\s\.]\d{4}',str(soup)):
         siteInfoDict['phone'] = re.findall('\(?\d{3}[\)-]?\s?\d{3}[-\s\.]\d{4}',str(soup))[0]
     if re.findall("[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+",str(soup)):
         siteInfoDict['email'] = re.findall("[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+",str(soup))[0]
     if not siteInfoDict['phone'] or not siteInfoDict['email'] and siteInfoDict['contactUrl']:
-        soup = getSoup(siteInfoDict['contactUrl'])
+        soup = await getSoupNoProxy(siteInfoDict['contactUrl'])
         if not siteInfoDict['phone'] and re.findall('\(?\d{3}[\)-]?\s?\d{3}[-\s\.]\d{4}',str(soup)):
             siteInfoDict['phone'] = re.findall('\(?\d{3}[\)-]?\s?\d{3}[-\s\.]\d{4}',str(soup))
         if not siteInfoDict['email'] and re.findall("[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+",str(soup)):
@@ -370,37 +361,39 @@ def getContactAbout(soup, siteInfoDict):
 
 def getOnsiteLinks(soup, siteInfoDict):
     links = soup.find_all('a')
+
     for link in links:
         link = link.get('href').lower()
         if link:
             link = re.sub(r'^/{2,10}','/', link)
             if not siteInfoDict['contactUrl']:
                 if 'contact' in link:
-                    siteInfoDict['contactUrl'] = cleanLink(link, siteInfoDict['mainUrl'])
+                    siteInfoDict['contactUrl'] = link
             if not siteInfoDict['aboutUrl']:
                 if 'about' in link:
-                    siteInfoDict['aboutUrl'] = cleanLink(link, siteInfoDict['mainUrl'])
+                    siteInfoDict['aboutUrl'] = link
             elif 'facebook.com' in link:
-                siteInfoDict['facebookUrl'] = cleanLink(link)
+                siteInfoDict['facebookUrl'] = link
             elif 'linkedin.com' in link:
-                siteInfoDict['linkedinUrl'] = cleanLink(link)
+                siteInfoDict['linkedinUrl'] = link
             elif 'twitter.com' in link:
-                siteInfoDict['twitterUrl'] = cleanLink(link)
+                siteInfoDict['twitterUrl'] = link
             elif 'pinterest.com' in link:
-                siteInfoDict['pinterestUrl'] = cleanLink(link)
+                siteInfoDict['pinterestUrl'] = link
             elif 'youtube.com' in link:
-                siteInfoDict['youtubeUrl'] = cleanLink(link)
+                siteInfoDict['youtubeUrl'] = link
             elif 'instagram.com' in link:
-                siteInfoDict['instagramUrl'] = cleanLink(link)
+                siteInfoDict['instagramUrl'] = link
             elif 'plus.google.com' in link:
-                siteInfoDict['googleplusUrl'] = cleanLink(link)
+                siteInfoDict['googleplusUrl'] = link
     return(siteInfoDict)
 
-def getDesc(siteInfoDict):
-    mainSiteSoup = getSoup(siteInfoDict['websiteUrl'])
+def getDesc(siteInfoDict, mainSiteSoup):
     if mainSiteSoup.find('meta',{'name':'description'}):
         data = str(mainSiteSoup.find('meta',{'name':'description'})).replace('<meta content="','').replace('" name="description"/>','')
         siteInfoDict['desc'] = (data[:75] + '..') if len(data) > 75 else data
+    return mainSiteSoup
+
 
 def bingDesc():
     url = "http://www.bing.com/search?q=site:" + plainUrl

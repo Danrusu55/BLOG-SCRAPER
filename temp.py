@@ -1,16 +1,27 @@
-for keyword in keywords_array:
-    keyword_exists = await objects.execute(Keyword.select(fn.COUNT(Keyword.id)).where(Keyword.keyword.contains(keyword)))
+from helper_functions import *
+from models import Influencer
 
-    count = keyword_exists._rows[0][0]
+proxy_gateway = 'http://108.59.14.208:13080'
 
-    if count == 0:
-        await objects.create(Keyword, keyword=keyword)
+headers = {
+	'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:57.0) Gecko/20100101 Firefox/57.0'
+}
 
+url = 'https://www.google.com/search'
 
+query = 'blog dog training'
 
+params = {
+    'q': query,
+    'ie': 'utf-8',
+    'oe': 'utf-8',
+    'filter': '0',
+    'num': '100'
+}
 
-	for keyword in keywords_array:
-        keyword_exists = Keyword.select().where(Keyword.keyword.contains(keyword)).count()
+while True:
+    r = requests.get(url, proxies=proxy_gateway, params=params, headers=headers)
 
-        if keyword_exists == 0:
-            await objects.create(Keyword, keyword=keyword)
+    soup = BeautifulSoup(r.content)
+
+    print(soup.title)

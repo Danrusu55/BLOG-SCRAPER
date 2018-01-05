@@ -3,21 +3,24 @@ import asyncio
 import aiohttp
 import async_timeout
 from peewee import fn
-
+import pdb
 from helper_functions import *
 from models import Influencer
 
 proxy_gateway = 'http://108.59.14.208:13080'
 
 headers = {
-	'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:57.0) Gecko/20100101 Firefox/57.0'
+	'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.94 Safari/537.36'
 }
 
 keywords = []
 keyword_iterator = None
 
 
+
 async def scrape1PageGoogle(query, keyword, start=0, count=10):
+	connector = aiohttp.TCPConnector(use_dns_cache=False, force_close=True)
+
 	params = {
 		'q': query,
 		'ie': 'utf-8',
@@ -32,22 +35,40 @@ async def scrape1PageGoogle(query, keyword, start=0, count=10):
 
 	url = 'https://www.google.com/search'
 
-	async with aiohttp.ClientSession() as session:
+	async with aiohttp.ClientSession(connector=connector) as session:
 		while True:
 			try:
-				with async_timeout.timeout(10):
-					async with session.get(url, params=params, headers=headers, proxy=proxy_gateway) as r:
-						txt = await r.text()
-						soup = BeautifulSoup(txt, 'html.parser')
-						# pdb.set_trace()
-						if 'https://www.google.com/search' in str(soup.title): continue
-						sites = await sitesFromGoogle(soup, keyword)
-						return sites
+				async with session.get(url, params=params, headers=headers, proxy=proxy_gateway, timeout=5) as r:
+					txt = await r.text()
+					soup = BeautifulSoup(txt, 'html.parser')
+					# pdb.set_trace()
+
+					if r.status in (503, 302):
+						print('We got blocked, continuing')
+
+						print(txt)
+						continue
+					sites = sitesFromGoogle(soup)
+					print(sites)
+					return sites
+			except (asyncio.CancelledError, asyncio.futures.TimeoutError) as ex:
+				print('Timed out while scraping Google page for keyword %s' % (keyword,))
+				# If we timed out, we retry
+				# We don't give up, it's a thing
+				continue
+
+			except aiohttp.ClientOSError as ex:
+				print('Problem while making request: %r' % (ex,))
+
+				continue
 			except Exception as err:
+				print(repr(err))
+
 				if '404' in str(err):
 					print('got 404 for ', url)
 					continue  # try again
 				elif 'unknown url type' in str(err):
+					print('unknown url type')
 					break  # end trying
 				else:
 					traceback.print_exc()
@@ -70,9 +91,29 @@ async def worker():
 				sites = await scrape1PageGoogle(query, keyword, start=i, count=100)
 
 				if not sites:
+					print('what')
 					continue
 
-				for site in sites:
+				print('Found %d sites from page %d of Google' % (len(sites), i / 100,))
+
+				site_info = []
+
+				for (mainUrl, cleanUrl, siteTitle) in sites:
+					site_info_d = initDict(mainUrl)
+
+					site_soup = await getSoupNoProxy('http://%s' % (mainUrl))
+
+					try:
+						getDesc(site_info_d, site_soup)
+						getBlogUrl(cleanUrl, mainUrl, siteTitle, site_info_d, site_soup)
+						getOnsiteLinks(site_soup, site_info_d)
+						await getPhoneEmail(site_soup, site_info_d)
+
+						site_info.append(site_info_d)
+					except Exception as ex:
+						pass
+
+				for site in site_info:
 					list_of_sites = await objects.execute(Influencer.select(fn.COUNT(Influencer.id)).where(
 						Influencer.websiteurl.contains(site['mainUrl'])))
 
@@ -100,7 +141,7 @@ async def worker():
 
 async def main(workers):
 	mysql.set_allow_sync(False)
-	await asyncio.gather(*tuple([worker() for _ in range(workers)]))
+	await asyncio.gather(*tuple([worker() for _ in range(1)]))
 	await mysql.close_async()
 
 
